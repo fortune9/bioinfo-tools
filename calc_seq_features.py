@@ -52,7 +52,7 @@ optParser.add_argument("infile",
 
 ## optional auxillary arguments
 optParser.add_argument("--column", "-c",
-	help="which column sequences are present,\n default is first column, i.e., 1",
+	help="which column contains sequences,\n default is first column, i.e., 0",
 	type=int,
 	metavar="column",
 	dest="seqCol", # the attribute name to store value
@@ -85,6 +85,7 @@ args = optParser.parse_args();
 #print(args);
 
 # start the analyses
+o=open(args.outFile, "w")
 f=open(args.infile, "r")
 ## determine what features to calculate
 featureFuncs = {
@@ -102,7 +103,7 @@ for feat, func in featureFuncs.items():
 	features.append(feat);
 	funcs.append(func);
 
-print(args.sep.join(["id",'seqLen'] + features));
+o.write(args.sep.join(["id",'seqLen'] + features)+'\n');
 id=0;
 for r in f:
 	r = r.strip().split(args.sep);
@@ -113,6 +114,13 @@ for r in f:
 	for func in funcs:
 		res.append(str(func(seq)));
 	#r.extend(res); # combine original line and results
-	print(args.sep.join(res))
+	#print(args.sep.join(res))
+	o.write(args.sep.join(res)+"\n");
+	if id % 10000 == 0:
+		print("[Info] {} sequences have been processed",
+				file=sys.stderr)
 
+f.close();
+o.close();
+print("Job is done", file=sys.stderr);
 sys.exit(0);
