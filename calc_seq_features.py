@@ -118,7 +118,7 @@ for r in f:
 	o.write(args.sep.join(res)+"\n");
 	if id % 10000 == 0:
 		print("[Info] {} sequences have been processed",
-				file=sys.stderr)
+			id, file=sys.stderr)
 
 f.close();
 o.close();
