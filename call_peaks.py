@@ -94,6 +94,7 @@ def p_for_depth(bgDepths, depth):
 	index=bs.bisect_left(bgDepths,depth);
 	size=len(bgDepths);
 	p=(size-index)/size; # upside fraction
+	if size == index: p = 1/size;
 	return(p);
 
 # set up arguments
@@ -215,18 +216,19 @@ i+=1;
 print("Step {0:2d}: scan for significant regions with FDR={1:.2f}".format(i, fdr));
 counter=0;
 results=[];
-for i in range(1,regionNum+1):
-	r=region_coord(regions,i);
+for j in range(1,regionNum+1):
+	r=region_coord(regions,j);
 	d=find_overlap_blocks(dat,r, True);
 	p=p_for_depth(bgDepths,d);
+	r.extend([d,p]);
 	#results.append([d,p]);
-	o.write("\t".join([str(d),str(p)]));
+	o.write("\t".join(map(str,r))+"\n");
 	counter+=1;
 	if counter % 10000 == 0:
 		print("{:10d} regions scanned".format(counter), file=sys.stderr);
 
 i+=1;
-print("Step {0:2d}: sharpen and merge regions");
+print("Step {0:2d}: sharpen and merge regions".format(i));
 
 # output the results
 
