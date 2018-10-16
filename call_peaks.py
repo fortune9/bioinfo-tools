@@ -178,8 +178,7 @@ i=1;
 print("Step {0:2d}: reading read depth data and chromosome sizes".format(i));
 
 dat=pd.read_csv(args.infile, sep="\t", header=None,
-		names=["chr","start","end","depth"], skiprows=1,
-			nrows=20000);
+		names=["chr","start","end","depth"], skiprows=1);
 chrSizes=pd.read_csv(args.csfile,
 sep="\t",header=None,names=["chr","size"]);
 # only consider the chromosomes existing in the data
@@ -206,6 +205,7 @@ tmp=None;
 bgDepths=pd.Series(bgDepths);
 cutoff=bgDepths.quantile(1-peakFrac);
 bgDepths=bgDepths[bgDepths<=cutoff];
+q99=bgDepths.quantile(0.99); # 99% quantile
 ## what is the distribution look like: poisson or guassian?
 bgFile="bg-depth."+str(os.getpid())+".csv";
 bgDepths.to_csv(bgFile, index=False);
@@ -215,7 +215,7 @@ i+=1;
 # this is the slowest step
 print("Step {0:2d}: scan for significant regions with FDR={1:.2f}".format(i, fdr));
 counter=0;
-results=[];
+results=[]; # here we will store only regions with p < 0.1 ?
 for j in range(1,regionNum+1):
 	r=region_coord(regions,j);
 	d=find_overlap_blocks(dat,r, True);
@@ -228,7 +228,7 @@ for j in range(1,regionNum+1):
 		print("{:10d} regions scanned".format(counter), file=sys.stderr);
 
 i+=1;
-print("Step {0:2d}: sharpen and merge regions".format(i));
+print("Step {0:2d}: merge and sharpen regions".format(i));
 
 # output the results
 
