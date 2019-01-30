@@ -5,6 +5,14 @@ import sys;
 import re;
 
 # functions
+def str_to_float(v,na_sub):
+	'''convert string values to float
+	'''
+	if v.upper() == 'NA':
+		return na_sub;
+	else:
+		return float(v);
+
 def warn(s):
 	''' output warning message
 	'''
@@ -51,8 +59,11 @@ def clear_bucket():
 			means.append("{:.5g}".format(m));
 			sdevs.append("{:.5g}".format(sd));
 	# output the values
-	chrStr = [lastChrom] if lastChrom is not None else [];
-	output( chrStr + segBucket[len(segBucket)-1] + means + sdevs);
+	segRange=segBucket[len(segBucket)-1];
+	# skip segs out of size range
+	if sizeRange[0] <=segRange[1] - segRange[0] + 1<=sizeRange[1]:
+		chrStr = [lastChrom] if lastChrom is not None else [];
+		output( chrStr + segBucket[len(segBucket)-1] + [len(lengths)] + means + sdevs);
 	# clear bucket
 	segBucket=[];
 
@@ -158,16 +169,16 @@ op.add_argument("--names",
 		)
 
 op.add_argument("-n", "--min",
-		help="the minimums (inclusive) for the examined value, in the same order as specified for --fields",
-		nargs="+",
-		type=float,
+		help="the minimums (inclusive) for the examined value, in the same order as specified for --fields. use 'NA' to indicate negative infinity [NA]",
+		nargs="*",
+		type=str,
 		dest='minCutoff'
 		);
 
 op.add_argument("-x", "--max",
-		help="the maximums (inclusive) for the examined value, in the same order as specified for --fields",
-		nargs='+',
-		type=float,
+		help="the maximums (inclusive) for the examined value, in the same order as specified for --fields. use 'NA' to indicate infinity [NA]",
+		nargs='*',
+		type=str,
 		dest='maxCutoff'
 		);
 
@@ -199,15 +210,16 @@ op.add_argument("--end",
 		);
 
 op.add_argument("--size",
-		help="the maximum size for output regions. For genomic regions, its is the length in bps; for others, it is the number of input lines. Default is no limit. [None]",
-		default=None,
-		dest='maxSize',
-		type=float
+		help="the size range for output bands. For genomic regions,	it is the length in bps; for others, it is the number of input lines. use 'NA' to indicate no limit. Default is any size. [NA NA]",
+		dest='sizeRange',
+		nargs="*",
+		default=['NA','NA']
 		);
 
 args = op.parse_args();
 minVals=args.minCutoff;
 maxVals=args.maxCutoff;
+
 if minVals is None and maxVals is None:
 	warn("At least one of the arguments '--min','--max' is needed");
 	sys.exit(2);
@@ -216,6 +228,13 @@ if not ( all(x is None for x in	[args.chrField,args.startField,args.endField])
 		or all(x is not None for x in [args.chrField,args.startField,args.endField])):
 	warn("The arguments '--chr', '--start', and '--end' are all needed if any is provided")
 	sys.exit(3);
+
+# parse input arguments accepting 'NA's
+if minVals is not None: minVals=[str_to_float(v, float('-inf')) for v in minVals];
+if maxVals is not None: maxVals=[str_to_float(v, float('inf')) for v in maxVals];
+sizeRange=args.sizeRange;
+sizeRange[0]=str_to_float(sizeRange[0], float('-inf'));
+sizeRange[1]=str_to_float(sizeRange[1], float('inf'));
 
 fieldNames=args.fieldNames;
 
@@ -234,7 +253,7 @@ for v in [minVals, maxVals, fieldNames]:
 i=open(args.inFile, "r");
 o=sys.stdout;
 header=[] if args.chrField is None else ['chrom'];
-header.extend(['start','end']);
+header.extend(['start','end','num_lines']);
 header.extend([x + '.mean' for x in fieldNames]);
 header.extend([x + '.stdev' for x in fieldNames]);
 output(header);
@@ -256,19 +275,20 @@ for r in i:
 			args.startField, args.endField]];
 		start=int(start); # get coordinates
 		end=int(end);
-		if lastStart is not None and lastStart > start:
+		if lastChrom is None: lastChrom=chrom; # initialize
+		if lastChrom != chrom: # new chrom
+			clear_bucket(); #output all remaining segments
+			lastChrom=chrom; # new chrom update
+		elif lastStart is not None and lastStart > start:
 			sys.exit(
 				"Input file is not coordinate sorted [{0}:{1}-{2}]".
 				format(lastChrom,start,end));
-		if lastChrom is not None and lastChrom != chrom: # new chrom
-			clear_bucket(); #output all remaining segments
-			lastChrom=chrom;
 		datumLen=end-start+1;
 		lastStart=start;
 	# add this datum
 	ok=grow_segs(datum, start, datumLen);
 	# something is wrong if ok is not none
-	if lineNum % 10000 == 0:
+	if lineNum % 100000 == 0:
 		warn(str(lineNum) + " lines have been processed");
 
 i.close();

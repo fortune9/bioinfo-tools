@@ -47,10 +47,15 @@ optParser=ap.ArgumentParser(
 
 ## positional arguments
 optParser.add_argument("regionFile",
-		help="file containing genomic region in bed format");
+		help="file containing genomic region in bed format, having at least 4 fields");
 
 optParser.add_argument("twobitFile",
 		help="the .2bit file from which sequences can be extracted");
+
+optParser.add_argument("-c", "--count-only",
+		help="if provided, only the number of CpGs in each region is returned",
+		action='store_true',
+		dest='countOnly');
 
 args=optParser.parse_args();
 sep="\t";
@@ -69,9 +74,14 @@ for l in r:
 		print("Cannot get sequence for [{0}]".format(l), file=sys.stderr);
 		next;
 	poses=list(CpG_pos(seq));
+	if args.countOnly: # count only 
+		print(sep.join(map(str, [chrom, start,end,name,len(poses)])))
+		continue;
+	# report positions otherwise
 	if len(poses) < 1: # no CpGs
-		print("#"+l+sep+"None");
-		next;
+		print('#'+sep.join(map(str, [chrom, start,
+				end,name+".CpG.NA"])));
+		continue;
 	else:
 		start=int(start);
 		i=0;
