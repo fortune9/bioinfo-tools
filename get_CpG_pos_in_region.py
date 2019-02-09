@@ -32,6 +32,7 @@ def get_seq(chrom, start, end):
 
 desc='''
 This program finds all the CpG positions in given genomic regions.
+The output is in bed format.
 ''';
 
 authorInfo='''
