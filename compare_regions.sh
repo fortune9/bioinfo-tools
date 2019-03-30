@@ -7,12 +7,10 @@ Usage: $0 <bed-file1> <bed-file2> [<sorted?> [<output-prefix>]]
 This program compares two bed-format region files and output three
 files:
 
-1. <output-prefix>.common.bed: the regions overlapped (see below) and
-overlapped length.
+1. <output-prefix>.common.bed: the regions overlapped (see below),
+which includes the input regions and their overlapped length.
 2. <output-prefix>.1_specific.bed: the regions specific to <bed-file1>.
 3. <output-prefix>.2_specific.bed: the regions specific to <bed-file2>.
-
-All the outputs report satisfying full entry of input files.
 
 The input files can be gzipped.
 If the input files have been sorted by coordinates, feed the 3rd
