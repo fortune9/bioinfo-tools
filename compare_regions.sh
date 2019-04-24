@@ -1,16 +1,26 @@
 #!/bin/bash
 
+set -e
+
+## functions
+function summary_file
+{
+	echo `gawk 'BEGIN{FS="\t";OFS="\t";i=0;s=0}{i++;s+=$3-$2;}END{print i,s;}' <(less $1)`
+}
+
+
 if [[ $# -lt 2 ]]; then
 	cat <<EOF
 Usage: $0 <bed-file1> <bed-file2> [<sorted?> [<output-prefix>]]
 
-This program compares two bed-format region files and output three
+This program compares two bed-format region files and output these
 files:
 
 1. <output-prefix>.common.bed: the regions overlapped (see below),
 which includes the input regions and their overlapped length.
 2. <output-prefix>.1_specific.bed: the regions specific to <bed-file1>.
 3. <output-prefix>.2_specific.bed: the regions specific to <bed-file2>.
+4. <output-prefix>.summary.tsv: gives a summary of results.
 
 The input files can be gzipped.
 If the input files have been sorted by coordinates, feed the 3rd
@@ -45,6 +55,7 @@ minFrac2=0.5;
 commFile=${outPre}.common.bed;
 bed1Spec=${outPre}.1_specific.bed;
 bed2Spec=${outPre}.2_specific.bed;
+sumFile=${outPre}.summary.tsv;
 
 if [[ ! $(command -v bedtools) ]]; then
 	echo "[ERROR] No command 'bedtools' found. Please install it"
@@ -64,6 +75,8 @@ else
 	inF2=$bedF2;
 fi
 
+echo "Job started at `date`"
+
 echo "[INFO] Get overlapped regions into '$commFile'"
 bedtools intersect -wo -a $inF1 -b $inF2 -f $minFrac1 -F $minFrac2 \
 -e -sorted >$commFile;
@@ -76,7 +89,32 @@ echo "[INFO] Get $bedF2 specific regions into '$bed2Spec'"
 bedtools intersect -v -b $inF1 -a $inF2 -f $minFrac1 -F $minFrac2 \
 -e -sorted >$bed2Spec
 
-echo "Job started at `date`"
+echo "[INFO] Summarize the results in '$sumFile'"
+
+total1Sum=$(summary_file $inF1)
+total2Sum=$(summary_file $inF2)
+spec1Sum=$(summary_file $bed1Spec )
+spec2Sum=$(summary_file $bed2Spec )
+file1NF=$(less $inF1 | head -1 | gawk '{print NF}')
+tmp1F=tmp1.$$
+tmp2F=tmp2.$$
+less $commFile | cut -f 1-$file1NF | uniq >$tmp1F
+file1NF=$(( file1NF + 1 ))
+less $commFile | cut -f $file1NF- | sort -k1,4 | uniq >$tmp2F
+comm1Sum=$(summary_file $tmp1F)
+comm2Sum=$(summary_file $tmp2F)
+
+cat >$sumFile <<EOF
+Type	Count	Size
+1_all	$total1Sum
+2_all	$total2Sum
+1_comm	$comm1Sum
+2_comm	$comm2Sum
+1_spec	$spec1Sum
+2_spec	$spec2Sum
+EOF
+
+rm $tmp1F $tmp2F;
 
 # remove generated sorted files if applicable
 if [[ ! $sorted ]]; then
