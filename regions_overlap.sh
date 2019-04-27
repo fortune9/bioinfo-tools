@@ -5,7 +5,7 @@ set -e
 ## functions
 function summary_file
 {
-	echo `gawk 'BEGIN{FS="\t";OFS="\t";i=0;s=0}{i++;s+=$3-$2;}END{print i,s;}' <(less $1)`
+	echo "`gawk	'BEGIN{FS="\t";OFS="\t";i=0;s=0}{i++;s+=$3-$2;}END{print i,s;}'	<(less $1)`"
 }
 
 
