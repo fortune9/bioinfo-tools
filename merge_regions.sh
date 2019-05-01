@@ -55,7 +55,7 @@ fi
 
 rm $tmpComm $tmpAspec $tmpBspec
 
-echo "Mergine is done" >&2
+echo "Merging is done" >&2
 
 exit 0;
 
