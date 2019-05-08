@@ -100,7 +100,7 @@ tmp1F=tmp1.$$
 tmp2F=tmp2.$$
 less $commFile | cut -f 1-$file1NF | uniq >$tmp1F
 file1NF=$(( file1NF + 1 ))
-less $commFile | cut -f $file1NF- | sort -k1,4 | uniq >$tmp2F
+less $commFile | cut -f $file1NF- | cut -f 1-4 | sort | uniq >$tmp2F
 comm1Sum=$(summary_file $tmp1F)
 comm2Sum=$(summary_file $tmp2F)
 
