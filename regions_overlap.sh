@@ -8,6 +8,10 @@ function summary_file
 	echo "`gawk	'BEGIN{FS="\t";OFS="\t";i=0;s=0}{i++;s+=$3-$2;}END{print i,s;}'	<(less $1)`"
 }
 
+function warn
+{
+	echo $* >&2
+}
 
 if [[ $# -lt 2 ]]; then
 	cat <<EOF
@@ -58,14 +62,14 @@ bed2Spec=${outPre}.2_specific.bed;
 sumFile=${outPre}.summary.tsv;
 
 if [[ ! $(command -v bedtools) ]]; then
-	echo "[ERROR] No command 'bedtools' found. Please install it"
+	warn "[ERROR] No command 'bedtools' found. Please install it"
 	exit 2;
 fi
 
 # use a different variable for input files, because sorting is needed
 # when necessary, without changing original files
 if [[ ! $sorted ]]; then
-	echo "[INFO] Sort input files in coordinates"
+	warn "[INFO] Sort input files in coordinates"
 	inF1="inFile.1.$$.bed"
 	inF2="inFile.2.$$.bed"
 	less $bedF1 | sort -k1,1 -k2,2n >$inF1
@@ -75,21 +79,21 @@ else
 	inF2=$bedF2;
 fi
 
-echo "Job started at `date`"
+warn "Job started at `date`"
 
-echo "[INFO] Get overlapped regions into '$commFile'"
+warn "[INFO] Get overlapped regions into '$commFile'"
 bedtools intersect -wo -a $inF1 -b $inF2 -f $minFrac1 -F $minFrac2 \
 -e -sorted >$commFile;
 
-echo "[INFO] Get $bedF1 specific regions into '$bed1Spec'"
+warn "[INFO] Get $bedF1 specific regions into '$bed1Spec'"
 bedtools intersect -v -a $inF1 -b $inF2 -f $minFrac1 -F $minFrac2 \
 -e -sorted >$bed1Spec
 
-echo "[INFO] Get $bedF2 specific regions into '$bed2Spec'"
+warn "[INFO] Get $bedF2 specific regions into '$bed2Spec'"
 bedtools intersect -v -b $inF1 -a $inF2 -f $minFrac1 -F $minFrac2 \
 -e -sorted >$bed2Spec
 
-echo "[INFO] Summarize the results in '$sumFile'"
+warn "[INFO] Summarize the results in '$sumFile'"
 
 total1Sum=$(summary_file $inF1)
 total2Sum=$(summary_file $inF2)
@@ -118,12 +122,12 @@ rm $tmp1F $tmp2F;
 
 # remove generated sorted files if applicable
 if [[ ! $sorted ]]; then
-	echo "Deleting temporary sorted files"
+	warn "Deleting temporary sorted files"
 	rm $inF1;
 	rm $inF2;
 fi
 
-echo "Job done at `date` !!!"
+warn "Job done at `date` !!!"
 
 exit 0;
 
