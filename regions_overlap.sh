@@ -3,6 +3,16 @@
 set -e
 
 ## functions
+
+function cmp_num()
+{
+	if [[ $(echo "$1 $3 $2" | bc ) -gt 0 ]]; then 
+		echo 1
+	else
+		echo ""
+	fi
+}
+
 function summary_file
 {
 	echo "`gawk	'BEGIN{FS="\t";OFS="\t";i=0;s=0}{i++;s+=$3-$2;}END{print i,s;}'	<(less $1)`"
@@ -15,7 +25,7 @@ function warn
 
 if [[ $# -lt 2 ]]; then
 	cat <<EOF
-Usage: $0 <bed-file1> <bed-file2> [<sorted?> [<output-prefix>]]
+Usage: $0 <bed-file1> <bed-file2> [<frac1> <frac2> <sorted?> [<output-prefix>]]
 
 This program compares two bed-format region files and output these
 files:
@@ -27,14 +37,28 @@ which includes the input regions and their overlapped length.
 4. <output-prefix>.summary.tsv: gives a summary of results.
 
 The input files can be gzipped.
-If the input files have been sorted by coordinates, feed the 3rd
+
+The common regions are the ones overlap between <bed-file1> and
+<bed-file2>. Here 'overlap' means the following 2 conditions are
+all satisfied:
+
+1. The overlapped region covers <frac1> fraction or more of the
+involved region from <bed-file1>.
+
+2. The overlapped region covers <frac2> fraction or more of the
+involved region from <bed-file2>.
+
+Otherwise the region is classified as file-specific.
+
+One can specify a value between 0 and 1 (inclusive) for the arguments
+<frac1> and <frac2> to define the overlap requirement. When the value
+is 0, it means the overlap requirement is 1bp, which is also the
+default.
+
+If the input files have been sorted by coordinates, feed the 5th
 argument with 'T', otherwise any other values to let the program to
 sort.
 
-The overlap between two regions is used to determine common regions
-between the two files. Right now, if >= 50% of a region in <bed-file1>
-is overlapped with any region in <bed-file2>, or vice versa, then the
-region is considered common in botn input files.
 
 The default value for output prefix is bed1_vs_bed2.\$\$, where \$\$
 is the PID.
@@ -46,16 +70,27 @@ fi
 
 bedF1=$1;
 bedF2=$2;
-sorted=${3:-""}
-outPre=${4:-bed1_vs_bed2.$$};
+minFrac1=${3:-1e-10}
+minFrac2=${4:-1e-10}
+sorted=${5:-""}
+outPre=${6:-bed1_vs_bed2.$$};
 #echo  ">$sorted<", $outPre
 
 if [[ "$sorted" != "T" ]]; then
 	sorted=""
 fi
+
+if [[ $(cmp_num "$minFrac1" 0 "==") ]]; then
+	minFrac1=1e-10;
+fi
+
+if [[ $(cmp_num "$minFrac2" -0 "==") ]]; then
+	minFrac2=1e-10;
+fi
+
+#echo "I got frac1:'$minFrac1', frac2: '$minFrac2'"; exit 0;
+
 # global variables
-minFrac1=0.5;
-minFrac2=0.5;
 commFile=${outPre}.common.bed;
 bed1Spec=${outPre}.1_specific.bed;
 bed2Spec=${outPre}.2_specific.bed;
