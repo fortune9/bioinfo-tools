@@ -18,7 +18,8 @@ function usage
 Usage: $0 <bed-file> <bedgraph-file> [<out-file>]
 
 This program reads a bed file and calculates the average on the values
-recorded on the 4th column of the <bedgraph-file>. Both input files
+recorded on the 4th column of the <bedgraph-file>, weighted by the
+overlapping length between regions. Both input files
 should be sorted in coordinates beforehand, and can be compressed.
 
 The output is written to <out-file>, if provided; otherwise to

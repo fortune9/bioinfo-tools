@@ -66,6 +66,8 @@ gCol=args.group - 1;
 vCol=args.value -1;
 wCol=args.weight - 1;
 
+#print("{} : {} : {}\n".format(gCol,vCol,wCol)); sys.exit(1);
+
 # start analysis
 o=open(args.outFile, "w") if args.outFile != sys.stdout else args.outFile;
 i=open(args.infile,"r");

@@ -61,10 +61,19 @@ while(my $values = next_value_pair())
 
 my $xSig=sqrt($n*$xSqSum - $xSum**2);
 my $ySig=sqrt($n*$ySqSum - $ySum**2);
-my $r = ($n*$xySum - $xSum*$ySum)/($xSig*$ySig);
+my $r = "NA";
 
 printf "#%s\t%s\n", "sample_size", "r";
-printf "%d\t%.6g\n", $n, $r;
+if($xSig != 0 and $ySig !=0)
+{
+	$r = ($n*$xySum - $xSum*$ySum)/($xSig*$ySig);
+	printf "%d\t%.6g\n", $n, $r;
+}else
+{
+	warn "The variances for input variables are 0; can't compute\n";
+	printf "%d\tNA\n", $n;
+}
+
 
 close $fh1;
 if(defined $inFile2) { close $fh2; }
