@@ -3,6 +3,9 @@
 use strict;
 use Getopt::Long;
 
+my $pg = $0;
+$pg =~ s!.*/!!;
+
 my $sep = "\t";
 
 my $cols;
@@ -50,7 +53,7 @@ my $counter = 0;
 
 if($noZero)
 {
-	warn "Data pairs being zeros will be excluded\n";
+	warn "[$pg] Data pairs being zeros will be excluded\n";
 }
 
 while(my $values = next_value_pair())
@@ -63,7 +66,7 @@ while(my $values = next_value_pair())
 	$ySqSum += $y**2;
 	$xySum += $x*$y;
 	$n++;
-	warn "$counter data points have been processed\n"
+	warn "[$pg] $counter data points have been processed\n"
 	if(++$counter % 100000 == 0);
 }
 
@@ -86,7 +89,7 @@ if($xSig != 0 and $ySig !=0)
 close $fh1;
 if(defined $inFile2) { close $fh2; }
 
-warn "[$0] Job is done at ".localtime()."\n";
+warn "[$pg] Job is done at ".localtime()."\n";
 
 exit 0;
 
