@@ -88,8 +88,8 @@ for r in i:
 			out=args.sep.join([lastG, "{:.4g}".format(totalV/(totalW or 1))]);
 			o.write(out+"\n");
 			counter+=1;
-			if counter % 10000 ==0:
-				print("[{1}] {0:6d} groups have been processed\n".format(
+			if counter % 100000 ==0:
+				print("[{1}] {0:6d} groups have been processed".format(
                                         counter,self),file=sys.stderr
 					);
 		# initialize
