@@ -1,9 +1,8 @@
-#!/bin/env perl
+#!/usr/bin/env perl
 
 use strict;
-#use File::Basename;
-#use lib dirname($0);
-use lib '/home/ec2-user/tools/extra/tmp-work/github/bioinfo-tools';
+use File::Basename;
+use lib dirname($0);
 use PM::Interval;
 
 my @args = @ARGV;
