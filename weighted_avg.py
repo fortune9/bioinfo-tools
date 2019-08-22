@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import sys;
+import os;
 import argparse as ap;
 
+self=os.path.basename(sys.argv[0]);
 
 desc='''
 This program calculates the group weighted mean by going through the
@@ -87,8 +89,8 @@ for r in i:
 			o.write(out+"\n");
 			counter+=1;
 			if counter % 10000 ==0:
-				print("{0:6d} groups have been processed\n".format(counter),
-					file=sys.stderr
+				print("[{1}] {0:6d} groups have been processed\n".format(
+                                        counter,self),file=sys.stderr
 					);
 		# initialize
 		lastG=g;
@@ -105,7 +107,7 @@ if lastG != "":
 o.close();
 i.close();
 
-print("Job is done [{0} groups in total]\n".format(counter),
-		file=sys.stderr);
+print("[{0}] Job is done [{1} groups in total]\n".format(
+            self,counter),file=sys.stderr);
 sys.exit(0);
 

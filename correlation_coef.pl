@@ -6,10 +6,12 @@ use Getopt::Long;
 my $sep = "\t";
 
 my $cols;
+my $noZero=0;
 
 GetOptions(
 	"col:s"	=> \$cols,
-	"sep:s"	=> \$sep
+	"sep:s"	=> \$sep,
+	"no-zero!" => \$noZero
 );
 
 my $inFile1 = shift;
@@ -46,9 +48,15 @@ my $xySum = 0;
 
 my $counter = 0;
 
+if($noZero)
+{
+	warn "Data pairs being zeros will be excluded\n";
+}
+
 while(my $values = next_value_pair())
 {
 	my ($x, $y) = @$values;
+	if($noZero and $x==0 and $y==0) { next; }
 	$xSum += $x;
 	$xSqSum += $x**2;
 	$ySum += $y;
@@ -78,7 +86,7 @@ if($xSig != 0 and $ySig !=0)
 close $fh1;
 if(defined $inFile2) { close $fh2; }
 
-warn "Job is done at ".localtime()."\n";
+warn "[$0] Job is done at ".localtime()."\n";
 
 exit 0;
 
@@ -144,11 +152,17 @@ one input file.
 
 --sep:  <string>, the field separator for input files. [tab]
 
+--no-zero: a switch option. When provided, the data point pairs
+whose values are all zeros are excluded in calculation. This is
+useful when computing read depths correlation between two samples.
+
 Example uses:
 # value in 2 files
 $0 --col 1,3 x.txt y.txt
 # value in 1 file
 $0 --col 1,3 all.txt
+# value in 1 file and exclude rows with all zeros
+$0 --no-zero --col 1,3 all.txt
 
 EOF
 

@@ -66,6 +66,8 @@ function usage()
 	cat <<EOF
 Usage: $0 [options] <read-file1> <read-file2> <bed-file1> [<bed-file2>]
 
+*Note*: all input files are allowed to be gzipped.
+
 This program computes the Pearson correlation for the read depths
 represented in the two mapped-reads files <read-file1> and <read-file2>. 
 
@@ -88,11 +90,23 @@ bed/gff format, they need be pre-sorted in coordinates with 'sort
 <bed-file1> and <bed-file2> needn't be pre-sorted.
 
 
---keep-avg: a witch option, when provided, the files containing
+--keep-avg: a switch option, when provided, the files containing
 computed read depths for each region are kept in a file.
+
+--no-zero: a switch option. If provided, then regions (or pairs)
+with all samples being zeros are excluded.
 
 Example uses:
 
+# get the correlation between sample1 and sample2 for the regions in
+# common.bed
+$0 sample1.bam sample2.bam common.bed
+
+# same as above, but keep the middle file with computed average depths
+$0 --keep-avg sample1.bam sample2.bam common.bed
+
+# exclude regions where read depths in both samples are 0
+$0 --no-zero sample1.bam sample2.bam common.bed
 
 EOF
 
@@ -116,6 +130,7 @@ if [[ $# -lt 3 ]]; then
 fi
 
 keepAvg="";
+noZero="";
 posArgs=();
 
 while [[ $# -gt 0 ]]; 
@@ -125,6 +140,9 @@ do
 	case $k in
 		--keep-avg)
 			keepAvg="T";
+			;;
+		--no-zero)
+			noZero="--no-zero";
 			;;
 		*)
 			posArgs+=("$k")
@@ -174,7 +192,7 @@ nf1=$(file_nf $bed1)
 nf2=$(file_nf $bed2)
 ok=$(add_signal $bed1 $sigFile1);
 ok=$(add_signal $bed2 $sigFile2);
-correlation_coef.pl --col $(( nf1 + 1)),$((nf2+1)) $bed1 $bed2
+correlation_coef.pl $noZero --col $(( nf1 + 1)),$((nf2+1)) $bed1 $bed2
 
 if [[ $keepAvg ]]; then
 		paste $bed1 $bed2 | gzip -c \
