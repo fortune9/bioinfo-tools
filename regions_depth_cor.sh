@@ -69,7 +69,8 @@ Usage: $0 [options] <read-file1> <read-file2> <bed-file1> [<bed-file2>]
 *Note*: all input files are allowed to be gzipped.
 
 This program computes the Pearson correlation for the read depths
-represented in the two mapped-reads files <read-file1> and <read-file2>. 
+as well as for log2-transformed depths represented in the two 
+mapped-reads files <read-file1> and <read-file2>. 
 
 When only <bed-file1> is provided, it calculates read depths for the
 regions in <bed-file1> using the <read-file1>, and then read depths
@@ -95,6 +96,10 @@ computed read depths for each region are kept in a file.
 
 --no-zero: a switch option. If provided, then regions (or pairs)
 with all samples being zeros are excluded.
+
+--pseudo-count <num>: a number added to original average depth values
+to compute log2-transformed data. This is necessary to save regions
+with depth being zeros. [0]
 
 Example uses:
 
@@ -132,6 +137,7 @@ fi
 keepAvg="";
 noZero="";
 posArgs=();
+pseudoCnt=0;
 
 while [[ $# -gt 0 ]]; 
 do
@@ -143,6 +149,10 @@ do
 			;;
 		--no-zero)
 			noZero="--no-zero";
+			;;
+		--pseudo-count)
+			pseudoCnt=$1;
+			shift;
 			;;
 		*)
 			posArgs+=("$k")
@@ -192,7 +202,7 @@ nf1=$(file_nf $bed1)
 nf2=$(file_nf $bed2)
 ok=$(add_signal $bed1 $sigFile1);
 ok=$(add_signal $bed2 $sigFile2);
-correlation_coef.pl $noZero --col $(( nf1 + 1)),$((nf2+1)) $bed1 $bed2
+correlation_coef.pl $noZero --log2 $pseudoCnt --col $(( nf1 + 1)),$((nf2+1)) $bed1 $bed2
 
 if [[ $keepAvg ]]; then
 		paste $bed1 $bed2 | gzip -c \
