@@ -10,11 +10,13 @@ my $sep = "\t";
 
 my $cols;
 my $noZero=0;
+my $pseudoCnt;
 
 GetOptions(
 	"col:s"	=> \$cols,
 	"sep:s"	=> \$sep,
-	"no-zero!" => \$noZero
+	"no-zero!" => \$noZero,
+	"log2:f" => \$pseudoCnt
 );
 
 my $inFile1 = shift;
@@ -43,11 +45,17 @@ my @cols=split ',', $cols;
 
 # now compute the sums of x and x^2
 my $n = 0;
+my $nForLog2 = 0; # counts for log2-value pairs
 my $xSum = 0;
 my $xSqSum = 0;
 my $ySum = 0;
 my $ySqSum = 0;
 my $xySum = 0;
+my $xLog2Sum = 0;
+my $xSqLog2Sum = 0;
+my $yLog2Sum = 0;
+my $ySqLog2Sum = 0;
+my $xyLog2Sum = 0;
 
 my $counter = 0;
 
@@ -66,6 +74,19 @@ while(my $values = next_value_pair())
 	$ySqSum += $y**2;
 	$xySum += $x*$y;
 	$n++;
+	if(defined $pseudoCnt)
+	{
+		$x+=$pseudoCnt;
+		$y+=$pseudoCnt;
+		if($x == 0 or $y==0) {next;}
+		$x=log2($x); $y=log2($y);
+		$xLog2Sum += $x;
+		$xSqLog2Sum += $x**2;
+		$yLog2Sum += $y;
+		$ySqLog2Sum += $y**2;
+		$xyLog2Sum += $x*$y;
+		$nForLog2++;
+	}
 	warn "[$pg] $counter data points have been processed\n"
 	if(++$counter % 100000 == 0);
 }
@@ -85,6 +106,24 @@ if($xSig != 0 and $ySig !=0)
 	printf "%d\tNA\n", $n;
 }
 
+if($nForLog2 > 0)
+{
+	printf "#%s\t%s\t(For log2 data)\n", "sample_size", "r";
+	$xSig=sqrt($nForLog2*$xSqLog2Sum - $xLog2Sum**2);
+	$ySig=sqrt($nForLog2*$ySqLog2Sum - $yLog2Sum**2);
+	$r='NA';
+	if($xSig != 0 and $ySig !=0)
+	{
+		$r = ($nForLog2*$xyLog2Sum - $xLog2Sum*$yLog2Sum)/($xSig*$ySig);
+		printf "%d\t%.6g\n", $nForLog2, $r;
+	}else
+	{
+		warn "The variances for log2-transformed variables are 0; can't compute\n";
+		printf "%d\tNA\n", $nForLog2;
+	}
+	
+
+}
 
 close $fh1;
 if(defined $inFile2) { close $fh2; }
@@ -128,6 +167,12 @@ sub next_value_pair
 	return [$x,$y];
 }
 
+sub log2
+{
+	my $x = shift;
+	return log($x)/log(2);
+}
+
 sub usage
 {
 	print <<EOF;
@@ -153,6 +198,11 @@ are present in the input file(s). The column number for a file
 starts from 1. Default: [1,1] for two input files, [1,2] for
 one input file.
 
+--log2: <num>, if this option is provided, then correlation for
+log2-transformed data will also be computed, and the provided value
+for this option will be used as a pseudocount to add to all values
+before transformation. []
+
 --sep:  <string>, the field separator for input files. [tab]
 
 --no-zero: a switch option. When provided, the data point pairs
@@ -166,6 +216,9 @@ $0 --col 1,3 x.txt y.txt
 $0 --col 1,3 all.txt
 # value in 1 file and exclude rows with all zeros
 $0 --no-zero --col 1,3 all.txt
+# also compute correlation for log2-transformed data with
+# pseudocount=1
+$0 --no-zero --col 1,3 --log2 1  all.txt
 
 EOF
 
