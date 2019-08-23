@@ -78,7 +78,7 @@ while(my $values = next_value_pair())
 	{
 		$x+=$pseudoCnt;
 		$y+=$pseudoCnt;
-		if($x == 0 or $y==0) {next;}
+		if($x <= 0 or $y<=0) {next;}
 		$x=log2($x); $y=log2($y);
 		$xLog2Sum += $x;
 		$xSqLog2Sum += $x**2;
