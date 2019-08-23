@@ -94,34 +94,43 @@ while(my $values = next_value_pair())
 my $xSig=sqrt($n*$xSqSum - $xSum**2);
 my $ySig=sqrt($n*$ySqSum - $ySum**2);
 my $r = "NA";
+my $s="%s";
 
-printf "#%s\t%s\n", "sample_size", "r";
+printf "#%s\t%s\t%s\t%s\t%s\t%s\n", "sample_size", "r", "mean_x", "sigma_x", "mean_y", "sigma_y";
 if($xSig != 0 and $ySig !=0)
 {
 	$r = ($n*$xySum - $xSum*$ySum)/($xSig*$ySig);
-	printf "%d\t%.6g\n", $n, $r;
+	$s="%.6g";
 }else
 {
 	warn "The variances for input variables are 0; can't compute\n";
-	printf "%d\tNA\n", $n;
+	#	printf "%d\tNA\t%.6g\t%.6g\t%.6g\t%.6g\n", $n, $xSum/$n,$xSig/$n,$ySum/$n,$ySig/$n;
 }
+printf "%d\t$s\t%.6g\t%.6g\t%.6g\t%.6g\n", 
+	$n, $r, $xSum/$n,sample_var($n,$xSig),$ySum/$n,sample_var($n,$ySig);
 
 if($nForLog2 > 0)
 {
-	printf "#%s\t%s\t(For log2 data)\n", "sample_size", "r";
+	printf "#%s\t%s\t%s\t%s\t%s\t%s\t(For log2 data)\n", 
+	"sample_size", "r", "mean_x", "sigma_x", "mean_y", "sigma_y";
 	$xSig=sqrt($nForLog2*$xSqLog2Sum - $xLog2Sum**2);
 	$ySig=sqrt($nForLog2*$ySqLog2Sum - $yLog2Sum**2);
 	$r='NA';
+	$s="%s";
 	if($xSig != 0 and $ySig !=0)
 	{
 		$r = ($nForLog2*$xyLog2Sum - $xLog2Sum*$yLog2Sum)/($xSig*$ySig);
-		printf "%d\t%.6g\n", $nForLog2, $r;
+		$s="%.6g";
+		#	printf "%d\t%.6g\n", $nForLog2, $r;
 	}else
 	{
 		warn "The variances for log2-transformed variables are 0; can't compute\n";
-		printf "%d\tNA\n", $nForLog2;
+		#printf "%d\tNA\n", $nForLog2;
 	}
 	
+	printf "%d\t$s\t%.6g\t%.6g\t%.6g\t%.6g\n", 
+		$nForLog2, $r, $xLog2Sum/$nForLog2,sample_var($nForLog2,$xSig),
+		$yLog2Sum/$nForLog2,sample_var($nForLog2, $ySig);
 
 }
 
@@ -131,6 +140,12 @@ if(defined $inFile2) { close $fh2; }
 warn "[$pg] Job is done at ".localtime()."\n";
 
 exit 0;
+
+sub sample_var
+{
+	my ($n, $nSigma) = @_;
+	return $nSigma/sqrt($n*($n-1)); # need correct sample size
+}
 
 sub _open_file
 {
