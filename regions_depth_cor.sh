@@ -174,7 +174,6 @@ bedFile2=${4:-$bedFile1};
 
 #echo $bedFile2; exit 1;
 
-tmpFiles=()
 out=tmp.cor.$$
 bed1=$out.1.bed
 bed2=$out.2.bed
@@ -212,6 +211,7 @@ fi
 
 # clean up
 if [[ $tmpFiles ]]; then
+	#echo "Clean up ${tmpFiles[@]}"
 	rm ${tmpFiles[@]}
 	#msg "No clean"
 fi
