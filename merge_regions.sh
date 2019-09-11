@@ -41,11 +41,11 @@ tmpBspec=tmp.$$.B.bed
 
 # get the common and specific intervals
 bedtools intersect -a $f1 -b $f2 | gawk \
-'BEGIN{OFS="\t";i=0}{i++; if(NF>3) {$4="comm.i" i "\t" $4;} else {$4="comm.i" i;} print $0}'	>$tmpComm
+'BEGIN{FS="\t";OFS="\t";i=0}{i++; if(NF>3) {$4="comm.i" i "\t" $4;} else {$4="comm.i" i;} print $0}'	>$tmpComm
 bedtools subtract  -a $f1 -b $f2 | gawk \
-'BEGIN{OFS="\t"}{i++; if(NF>3) { $4= "A.spec.i" i "\t" $4; } else {$4="A.spec.i" i; } print $0}'	>$tmpAspec
+'BEGIN{FS="\t";OFS="\t"}{i++; if(NF>3) { $4= "A.spec.i" i "\t" $4; } else {$4="A.spec.i" i; } print $0}'	>$tmpAspec
 bedtools subtract  -b $f1 -a $f2 | gawk \
-'BEGIN{OFS="\t"}{i++; if(NF>3) { $4="B.spec.i" i "\t" $4; } else { $4="B.spec.i" i;} print $0}'	>$tmpBspec
+'BEGIN{FS="\t";OFS="\t"}{i++; if(NF>3) { $4="B.spec.i" i "\t" $4; } else { $4="B.spec.i" i;} print $0}'	>$tmpBspec
 
 if [[ "$o" ]]; then
 	cat $tmpComm $tmpAspec $tmpBspec | sort -k1,1 -k2,2n > $o
