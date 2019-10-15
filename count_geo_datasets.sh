@@ -145,14 +145,18 @@ queryStr+=" AND $platStr"
 #msg "Constructed query string is: '$queryStr'"
 
 #touch $outFile
-echo -e "#year\tcount" >$outFile
+echo -e "#year\tGSE\tsampleCount" >$outFile
 
 for yr in `seq $startYear $endYear`;
 do
 	query="$queryStr AND $yr[pdat]"
 	msg "Searching '$query' in database $db"
-	esearch -db $db -query "$query" | xtract -pattern ENTREZ_DIRECT \
-		-pfx "$yr\t" -element Count >>$outFile
+	esearch -db $db -query "$query" | esummary -format docsum \
+		| xtract -pattern DocumentSummary -pfx "$yr\t" \
+		-element DocumentSummary/Accession -block Samples \
+		-element "#Accession" >>$outFile
+		#| xtract -pattern ENTREZ_DIRECT \
+		#-pfx "$yr\t" -element Count >>$outFile
 	sleep 1;
 done
 
