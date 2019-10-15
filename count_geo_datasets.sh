@@ -65,7 +65,8 @@ depends=(esearch xtract)
 for e in ${depends[@]}
 do
 	if [[ ! $(check_exe $e) ]]; then
-		echo "Command '$e' does not exist"
+		msg "Command '$e' does not exist"
+		msg "Please install Linux package 'ncbi-entrez-direct'"
 		exit 1;
 	fi
 done
