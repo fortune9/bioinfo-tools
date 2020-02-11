@@ -22,6 +22,7 @@ tmpFiles+=("$bashFuncFile")
 
 pg=${BASH_SOURCE[0]}
 pgDir=`dirname $pg`
+pg=`basename $pg`
 
 # add the program folder and pwd to PATH
 PATH=.:$pgDir:$PATH;
@@ -216,7 +217,7 @@ if [[ $tmpFiles ]]; then
 	#msg "No clean"
 fi
 
-msg "[`basename $0`] Job is done at `date`"
+msg "Job is done at `date`"
 
 exit 0;
 
