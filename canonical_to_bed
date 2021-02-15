@@ -3,9 +3,10 @@
 function usage()
 {
 	cat << EOF
-	Usage: $0 [-c column] [-s seqname-file] [-o outfile] <input-gz-file>
+	Usage: $0 [-opt value] <knownCanonical.txt.gz>
 	This program converts the downloaded knownCanonical.txt.gz from
-	UCSC into a bed format (4 columns).
+	UCSC into a bed format (4 columns, or 5 columns if option -k is
+	provided).
 
 	Options:
 
@@ -16,11 +17,14 @@ function usage()
 	   on these sequences will be output. In default, all genes in the
 	   input will be output. This file should have one name per line.
 	
+	-k knownGene.txt.gz, the knowgene table downloaded from UCSC,
+	   from which the strand information will be added to output.
+	
 	-o outfile, the output filename. Default is to replace "txt.gz"
 	   with "bed.gz" in input file
 
 	Example usage:
-	$0 -c 4 knownCanonical.bed.gz
+	$0 -c 4 knownCanonical.txt.gz
 EOF
 	exit 1;
 }
@@ -29,7 +33,7 @@ if [[ $# -lt 1 ]]; then
 	usage
 fi
 
-while getopts ":c:s:o:" x; do
+while getopts ":c:s:o:k:" x; do
 	case $x in
 		c)
 			col=${OPTARG}
@@ -39,6 +43,9 @@ while getopts ":c:s:o:" x; do
 			;;
 		o)
 			outfile=${OPTARG}
+			;;
+		k)
+			kgFile=${OPTARG}
 			;;
 		*)
 			echo "Invalid Option: -$OPTARG" 1>&2
@@ -69,8 +76,15 @@ fi
 
 echo "Converting $f with gene name located at column $col"
 
-zcat $f | gawk -v OFS="\t" -v c=$col '{print $1, $2, $3, $c}' \
-	| LC_ALL=C sort -k1,1 -k2,2n | gzip -c >$outfile
+if [[ -n "$kgFile" ]]; then # knowgene table provided
+	join -1 5 -2 1 -t $'\t' -o 1.1,1.2,1.3,1.$col,2.2 \
+		<(zcat $f | LC_ALL=C sort -k5,5) \
+		<(zcat $kgFile | cut -f 1,3 | LC_ALL=C sort -k1,1 | uniq) \
+		| LC_ALL=C sort -k1,1 -k2,2n | gzip -c >$outfile
+else
+	zcat $f | gawk -v OFS="\t" -v c=$col '{print $1, $2, $3, $c}' \
+		| LC_ALL=C sort -k1,1 -k2,2n | gzip -c >$outfile
+fi
 
 if [[ -n "$seqnameFile" ]]; then
 	echo "Filtering based on sequence names"
