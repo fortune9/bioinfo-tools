@@ -104,6 +104,7 @@ op<-foverlaps(regions, feats,
               type="any", mult="all", nomatch="NA", which=T)
 ## collapse all overlapped features for each region
 featIds<-op[, get_ids(yid, feats, "V4"), by=xid]
+#save.image("tmp.RDa"); q("no")
 regions[, (featName) := featIds$V1]
 if("startZZ" %in% colnames(regions)) {
     regions$startZZ<-NULL
@@ -111,7 +112,7 @@ if("startZZ" %in% colnames(regions)) {
 }
 
 message("Writing results")
-write_data(regions, file=outFile, sep="\t")
+write_data(regions, file=outFile, sep="\t", na='""')
 
 message("Job is done")
 
