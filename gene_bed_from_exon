@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -e
+#set -x # for debug
+
+if [[ $# -lt 1 ]]; then
+    cat <<EOF
+Usage: $0 <exons.bed.gz>
+
+This program infers the span of genes based on
+the coordinates of the exons.
+
+The input file <exons.bed.gz> must be in bed format
+with the gene_id at column 7, and the exons for the
+same gene should be in consecutive lines.
+
+Output is in bed format and will be written to console
+
+EOF
+
+    exit 1;
+fi
+
+function read_data {
+    f=$1
+    if [[ $f =~ \.gz$ ]]; then
+        openMethod='zcat'
+    else
+        openMethod=cat
+    fi
+    # sort by both chromosomes and gene names to solve
+    # the problem that the same gene name appears on mulitiple
+    # chromosomes: keeping them separate
+    $openMethod "$f" | sort -k1,1 -k7,7
+}
+
+read_data $1 | gawk -v FS="\t" -v OFS="\t" \
+'BEGIN{g="";}
+{if( g == "") { # initialize
+	chr=$1; s=$2; e=$3; strand=$6; g=$7;
+	}
+ else if( g != $7) { # new gene
+	print chr, s, e, g, ".", strand; # print out
+	chr=$1; s=$2; e=$3; strand=$6; g=$7;
+	}
+ else { # update start and end if necessary
+	if(s > $2) { s=$2; }
+	if(e < $3) { e=$3; }
+	}
+}
+END{print chr, s, e, g, ".", strand;}'
+
