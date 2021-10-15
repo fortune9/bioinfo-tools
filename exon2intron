@@ -2,6 +2,19 @@
 
 use strict;
 use warnings;
+use Getopt::Long;
+
+my $verbose = 0;
+my $numNoIntron = 0;
+my $numWithIntron = 0;
+
+GetOptions(
+    'verbose!'  => \$verbose
+);
+
+#if(not @ARGV) {
+#    die "Usage: $0 [option] <exons.bed";
+#}
 
 # all exons in a transcript must appear in consecutive lines in the
 # input file
@@ -28,7 +41,7 @@ while(<>) {
     if($rna ne $exonSet[0]) { # new RNA
         my $intronsRef = extract_introns(\@exonSet);
         unless($intronsRef) {
-            warn "No introns for $exonSet[0]\n";
+            warn "No introns for $exonSet[0]\n" if($verbose);
         }
         output_introns($intronsRef);
         # re-initialize
@@ -47,6 +60,8 @@ if(@exonSet) {
 }
 
 warn "Job [$counter lines in total] is done\n";
+warn "Transcripts with Intron: $numWithIntron\n";
+warn "Transcripts w/o Intron: $numNoIntron\n";
 
 exit 0;
 
@@ -91,9 +106,10 @@ sub extract_introns {
 
 sub output_introns {
     my $intronsRef = shift;
-    return unless $intronsRef; # No introns
+    ++$numNoIntron and return unless $intronsRef; # No introns
     foreach (@$intronsRef) {
         print join("\t", @$_), "\n";
     }
+    ++$numWithIntron;
 }
 
