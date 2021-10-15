@@ -1,0 +1,334 @@
+#!/usr/bin/env perl
+
+use strict;
+use Getopt::Long;
+use File::Basename;
+
+my $gtfFile;
+my $geneFile;
+my $tsptFile;
+my $cdsFile;
+my $exonFile;
+my $gtfFormat = "ensembl";
+my $outBase;
+
+GetOptions(
+    "gtf-format:s"  => \$gtfFormat,
+    "outbase:s"     => \$outBase,
+    "gene-file:s"   => \$geneFile,
+    "transcript-file:s"   => \$tsptFile,
+    "exon-file:s"   => \$exonFile,
+    "cds-file:s"   => \$cdsFile
+);
+
+$gtfFormat = lc($gtfFormat);
+$gtfFile = shift @ARGV;
+
+if(! $gtfFile) {
+    usage("Input GTF file is missing");
+    exit 1;
+}
+
+# The following arrays for storing feature types and  output filenames
+my @featTypes = qw/gene transcript cds exon/;
+my @featFiles = ($geneFile, $tsptFile, $cdsFile, $exonFile);
+my %outFhs; # store output filehandles
+# get output file handles
+for(my $i = 0; $i <= $#featTypes; $i++) {
+    $featFiles[$i] = get_outfile_name($gtfFile,
+                        $featFiles[$i], 
+                        $featTypes[$i]
+                    );
+    if($featFiles[$i]) {
+        $outFhs{$featTypes[$i]} = open_file($featFiles[$i], ">");
+    }
+}
+
+my $gtfFh = open_gtf_file($gtfFile);
+
+my $record;
+my $counter = 0;
+while($record = next_record($gtfFh)) {
+    # check whether the parsed record is needed
+    if(exists($outFhs{lc($record->{'type'})})) {
+            write_record($record, $outFhs{lc($record->{'type'})});
+        }
+    if(++$counter % 10000 == 0) {
+        info(sprintf("%10d lines have been processed", $counter));
+    }
+}
+
+close_file($gtfFh);
+map { close_file($_) } values(%outFhs);
+
+info("Job is done");
+info("Results are in:\n ", join("\n  ", grep {$_} @featFiles));
+
+exit 0;
+
+sub get_outfile_name {
+    my $inFile=shift;
+    my $outFile=shift;
+    my $type=shift;
+    if($outFile eq '#') { return(""); }
+    # filename provided
+    if($outFile) { return $outFile; }
+    # otherwise generate new outfile name
+    my $prefix;
+    if($outBase) {
+        $prefix = $outBase eq '#'? '' : $outBase.".";
+    } else {
+        ($prefix,undef,undef) = fileparse($inFile, qr/\.gtf(\.gz)?/i);
+        $prefix .= '.';
+    }
+    my $suffix;
+    if($type eq 'gene') {
+        $suffix = "genes.bed.gz";
+    } elsif ($type eq 'transcript') {
+        $suffix = "transcripts.bed.gz";
+    } elsif ($type eq 'cds') {
+        $suffix = "cdss.bed.gz";
+    } elsif ($type eq 'exon') {
+        $suffix = "exons.bed.gz";
+    } else {
+        error("Unknown output file type '$type'");
+        exit 3;
+    }
+
+    return($prefix.$suffix);
+}
+
+sub usage {
+    print <<EOF;
+Usage: $0 [options] <gtf-file>
+
+This program reads a GTF-formatted file and output
+several bed-formatted files.
+
+Options (default values are in []):
+
+--gtf-format <str>: the format of input gtf file. Choices are
+    [ensembl, ucsc, ncbi]. This info is used to parse the 9th
+    field in the file. [ensembl].
+
+--outbase <str>: the basename for output files. For example, if
+    'aa' is provided, then gene file name will be 'aa.genes.bed.gz'.
+    Specially, if '#' is provided, then all output files will not
+    have basename, so genes will be in 'genes.bed.gz', exons will
+    be in 'exons.bed.gz', etc. This option is overriden by the 
+    following options specifying each feature type such as --gene-file.
+
+--gene-file <path>: the bed file to store genes in bed format. 
+    Use an empty string '#' to suppress the output. Default is
+    replace input file's extension with '.genes.bed.gz'.
+    [<gtf-file>.genes.bed.gz]
+
+--transcript-file <path>: the bed file to store transcripts in
+    bed format. Use an empty string '#' to suppress the output.
+    [<gtf-file>.transcripts.bed.gz]
+
+--exon-file <path>: the bed file to store exons in bed format. 
+    Use an empty string '#' to suppress the output.
+    [<gtf-file>.exons.bed.gz]
+
+--cds-file <path>: the bed file to store CDSs in bed format. 
+    Use an empty string '#' to suppress the output.
+    [<gtf-file>.cdss.bed.gz]
+
+Example use:
+
+$0 <test.gtf.gz>
+
+EOF
+    if(@_) {
+        error(@_);
+    }
+}
+
+sub info {
+    my $str = sprintf("[%s >> INFO] %s\n", scalar(localtime),
+        join(" ", @_));
+    print $str;
+}
+
+sub error {
+    my $str = sprintf("[%s >> ERROR] %s\n", scalar(localtime), 
+        join(" ", @_));
+    print STDERR $str;
+}
+
+sub open_file {
+    my $f = shift;
+    my $mode = shift || "<";
+    my $fh;
+    # compressed file
+    if($f =~ /\.gz$/i) {
+        if($mode eq '<') {
+            open($fh, "zcat $f |") or die "Can't open '$f' with mode '$mode':$!";
+        } else {
+            open($fh, "| gzip -c >$f") or die "Can't open '$f' with mode '$mode':$!";
+        }
+    } else {
+        open($fh, "$mode $f") or die "Can't open '$f' with mode '$mode':$!";
+    }
+    my $fhObj = {
+        '_handle' => $fh,
+        '_stack'  => []
+    };
+    return($fhObj);
+}
+
+sub close_file {
+    my $fhObj = shift;
+    close $fhObj->{'_handle'};
+}
+
+sub next_line {
+    my $fhObj = shift;
+    if(@{$fhObj->{'_stack'}}) {
+        return shift(@{$fhObj->{'_stack'}});
+    }
+    # otherwise read a new line
+    my $fh = $fhObj->{'_handle'};
+    #if(eof($fh)) { return undef; }
+    return <$fh>;
+}
+
+sub push_line {
+    my $fhObj = shift;
+    push @{$fhObj->{'_stack'}}, @_;
+    return scalar(@_);
+}
+
+sub open_gtf_file {
+    my $f = shift;
+    return open_file($f, @_);
+}
+
+# write lines to a filehandle
+sub write_lines {
+    my $fhObj = shift;
+    my $fh = $fhObj->{'_handle'};
+    print $fh join("\n", @_), "\n";
+}
+
+# get next feature record from the gtf file
+sub next_record {
+    my $fh = shift;
+    my $line;
+    while($line = next_line($fh)) {
+        next if $line =~ /^#/ or $line =~ /^\s*$/; # skip comment and empty lines
+        last;
+    }
+    unless($line) { return undef; } # no more lines
+    # otherwise parse the record
+    my @fields = split "\t", $line;
+    die "Unknow for format for '$line'" unless($#fields == 8);
+    my $feat = $fields[2];
+    my $attrs = parse_attrs($fields[8], $feat);
+    my %record = (
+        type => $feat,
+        data => [$fields[0],
+                 $fields[3]-1,
+                 $fields[4],
+                 $attrs->{'id'},
+                 $fields[5],
+                 $fields[6],
+                 $attrs->{'extra'} # extra info
+        ]
+    );
+    return \%record;
+}
+
+# write out a record
+sub write_record {
+    my $record = shift;
+    my $fh = shift;
+    # prepare a line from the record
+    my $line = join("\t", @{$record->{data}});
+    write_lines($fh, $line);
+}
+
+# parse the attribute fields
+sub parse_attrs {
+    my $str = shift;
+    my $feat = shift;
+    chomp $str;
+    # use quotes to separate the fields, two types: one followed by';'
+    # and the other not
+    my @data = split /\s*(?:"(?!;)|";)\s*/, $str;
+    if(@data % 2 != 0) {
+        die "Unknown data string: '$str', $!";
+    }
+    # process the data to generate needed components.
+    my %res = @data;
+    my $attrs;
+    if($gtfFormat eq 'ensembl') {
+        $attrs = _parse_attrs_ensembl($feat, \%res)
+    } elsif($gtfFormat eq 'ncbi') {
+        $attrs = _parse_attrs_ncbi($feat, \%res)
+    } elsif($gtfFormat eq 'ucsc') {
+        $attrs = _parse_attrs_ucsc($feat, \%res)
+    } else {
+        die "Unknown gtf format '$gtfFormat':$!";
+    }
+    return $attrs;
+}
+
+sub _parse_attrs_ensembl {
+    my $feat = shift;
+    my $dat = shift;
+    my $extraSep = ':::';
+
+    my $geneId = $dat->{'gene_id'}.'.'.$dat->{'gene_version'};
+    my %attrs;
+    my @extra; # array for extra info
+    if($feat eq 'gene') {
+        @extra = ($dat->{'gene_name'}, $dat->{'gene_biotype'});
+        %attrs = (
+            id => $geneId,
+            extra => join($extraSep, @extra)
+        );
+    } elsif($feat eq 'transcript') {
+        @extra = ($geneId, $dat->{'transcript_support_level'}, $dat->{'transcript_biotype'});
+        %attrs = (
+            id => $dat->{'transcript_id'}.'.'.$dat->{'transcript_version'},
+            extra => join($extraSep, @extra)
+        );
+    } elsif($feat eq 'exon') {
+        @extra = ($geneId);
+        my $tsId = $dat->{'transcript_id'}.'.'.$dat->{'transcript_version'};
+        %attrs = (
+            id => $tsId.':'.$dat->{'exon_number'},
+            extra => join($extraSep, @extra)
+        )
+    } elsif($feat eq 'CDS') {
+        my $tsId = $dat->{'transcript_id'}.'.'.$dat->{'transcript_version'};
+        my $protId = $dat->{'protein_id'}.'.'.$dat->{'protein_version'};
+        @extra = ($geneId, $protId);
+        %attrs = (
+            id => $tsId.':'.$dat->{'exon_number'},
+            extra => join($extraSep, @extra)
+        );
+    } else {
+        # skip other features at present
+        %attrs = (
+            id => $geneId,
+            extra => 'skip#'.$feat
+        );
+    }
+    return \%attrs;
+}
+
+sub _parse_attrs_ucsc {
+    my $feat = shift;
+    my $dat = shift;
+    die "Not implemented";
+}
+
+sub _parse_attrs_ncbi {
+    my $feat = shift;
+    my $dat = shift;
+
+    die "Not implemented";
+}
