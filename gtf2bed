@@ -11,9 +11,11 @@ my $cdsFile;
 my $exonFile;
 my $gtfFormat = "ensembl";
 my $outBase;
+my $outDir;
 
 GetOptions(
     "gtf-format:s"  => \$gtfFormat,
+    "outdir:s"      => \$outDir,
     "outbase:s"     => \$outBase,
     "gene-file:s"   => \$geneFile,
     "transcript-file:s"   => \$tsptFile,
@@ -47,13 +49,15 @@ for(my $i = 0; $i <= $#featTypes; $i++) {
 my $gtfFh = open_gtf_file($gtfFile);
 
 my $record;
+my %recordCount;
 my $counter = 0;
 while($record = next_record($gtfFh)) {
     # check whether the parsed record is needed
     if(exists($outFhs{lc($record->{'type'})})) {
             write_record($record, $outFhs{lc($record->{'type'})});
+            $recordCount{lc($record->{'type'})}++;
         }
-    if(++$counter % 10000 == 0) {
+    if(++$counter % 100000 == 0) {
         info(sprintf("%10d lines have been processed", $counter));
     }
 }
@@ -61,10 +65,22 @@ while($record = next_record($gtfFh)) {
 close_file($gtfFh);
 map { close_file($_) } values(%outFhs);
 
+remove_empty_files();
+
 info("Job is done");
 info("Results are in:\n ", join("\n  ", grep {$_} @featFiles));
 
 exit 0;
+
+sub remove_empty_files {
+    for(my $i = 0; $i <= $#featTypes; $i++) {
+        if($recordCount{$featTypes[$i]} < 1) {
+          info("No records for '$featTypes[$i]'");
+          $featFiles[$i]="";
+          unlink $featFiles[$i];
+        }
+    }
+}
 
 sub get_outfile_name {
     my $inFile=shift;
@@ -72,7 +88,10 @@ sub get_outfile_name {
     my $type=shift;
     if($outFile eq '#') { return(""); }
     # filename provided
-    if($outFile) { return $outFile; }
+    if($outFile) {
+        $outFile = $outDir.'/'.$outFile if(defined $outDir);
+        return $outFile; 
+    }
     # otherwise generate new outfile name
     my $prefix;
     if($outBase) {
@@ -81,6 +100,8 @@ sub get_outfile_name {
         ($prefix,undef,undef) = fileparse($inFile, qr/\.gtf(\.gz)?/i);
         $prefix .= '.';
     }
+    # prepend output dir
+    if(defined $outDir) { $prefix = $outDir.'/'.$prefix; }
     my $suffix;
     if($type eq 'gene') {
         $suffix = "genes.bed.gz";
@@ -110,6 +131,9 @@ Options (default values are in []):
 --gtf-format <str>: the format of input gtf file. Choices are
     [ensembl, ucsc, ncbi]. This info is used to parse the 9th
     field in the file. [ensembl].
+
+--outdir <path>: output directory, which is prepended to output
+    files. [].
 
 --outbase <str>: the basename for output files. For example, if
     'aa' is provided, then gene file name will be 'aa.genes.bed.gz'.
@@ -329,6 +353,45 @@ sub _parse_attrs_ucsc {
 sub _parse_attrs_ncbi {
     my $feat = shift;
     my $dat = shift;
+    my $extraSep = ':::';
 
-    die "Not implemented";
+    my $geneId = $dat->{'gene_id'};
+    my %attrs;
+    my @extra; # array for extra info
+    if($feat eq 'gene') {
+        @extra = ($dat->{'gene'}, $dat->{'gene_biotype'});
+        %attrs = (
+            id => $geneId,
+            extra => join($extraSep, @extra)
+        );
+    } elsif($feat eq 'transcript') {
+        # so far, no transcript feature found from NCBI gtf file
+        @extra = ($geneId, $dat->{'transcript_support_level'}, $dat->{'transcript_biotype'});
+        %attrs = (
+            id => $dat->{'transcript_id'}.'.'.$dat->{'transcript_version'},
+            extra => join($extraSep, @extra)
+        );
+    } elsif($feat eq 'exon') {
+        @extra = ($geneId);
+        my $tsId = $dat->{'transcript_id'};
+        %attrs = (
+            id => $tsId.':'.$dat->{'exon_number'},
+            extra => join($extraSep, @extra)
+        )
+    } elsif($feat eq 'CDS') {
+        my $tsId = $dat->{'transcript_id'};
+        my $protId = $dat->{'protein_id'};
+        @extra = ($geneId, $protId);
+        %attrs = (
+            id => $tsId.':'.$dat->{'exon_number'},
+            extra => join($extraSep, @extra)
+        );
+    } else {
+        # skip other features at present
+        %attrs = (
+            id => $geneId,
+            extra => 'skip#'.$feat
+        );
+    }
+    return \%attrs;
 }
