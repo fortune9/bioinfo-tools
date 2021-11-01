@@ -11,7 +11,7 @@ params.taskCpus = 1
 params.taskMemory = "2 GB"
 params.useRefFile = false // use chromosome name reference file?
 params.cytoContexts = 'CpG'
-params.mbuilderContainer = $mbuilderContainer
+//params.mbuilderContainer = \$mbuilderContainer
 
 log.info """\
          Build Methylation Matrix - N F   P I P E L I N E
@@ -22,6 +22,11 @@ log.info """\
          useRefFile   : ${params.useRefFile}
          awsQueue     : ${params.awsQueue}
          awsContainer : ${params.container}
+
+         Example use:
+         nextflow run mbuild.nf --bgFiles 's3://path/*.bedgraph.gz' \
+            --useRefFile --mbuilderContainer <mbuilder-docker-img:tag> \
+            -with-docker
          ===================================
          """
          .stripIndent()
@@ -40,7 +45,8 @@ if(workflow.profile == 'batch') {
 }
 
 Channel
-    .fromPath(params.bgFiles, checkIfExists:true)
+    //.fromPath(params.bgFiles, checkIfExists:true)
+    .fromPath(params.bgFiles.split(/\s+/).flatten(), checkIfExists:true)
     .set {bedgraph}
 
 process build_chr_ref {
@@ -62,7 +68,7 @@ process build_chr_ref {
         """
     } else {
         """
-        echo "No chr ref file"
+        echo "No chr ref file" >refFile.txt
         """
     }
 }
