@@ -76,8 +76,8 @@ sub remove_empty_files {
     for(my $i = 0; $i <= $#featTypes; $i++) {
         if($recordCount{$featTypes[$i]} < 1) {
           info("No records for '$featTypes[$i]'");
-          $featFiles[$i]="";
           unlink $featFiles[$i];
+          $featFiles[$i]="";
         }
     }
 }
