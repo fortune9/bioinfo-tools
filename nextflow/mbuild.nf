@@ -25,15 +25,16 @@ log.info """\
 
          Example use:
          nextflow run mbuild.nf --bgFiles 's3://path/*.bedgraph.gz' \
-            --useRefFile --mbuilderContainer <mbuilder-docker-img:tag> \
-            -with-docker
+            --useRefFile -with-docker <mbuilder-docker-img:tag>
          ===================================
          """
          .stripIndent()
 
+/*
 if(!params.mbuilderContainer) {
     exit 1, "Please set environment variable 'mbuilderContainer'"
 }
+*/
 
 if(workflow.profile == 'batch') {
     if(!params.awsQueue) {
@@ -93,7 +94,7 @@ process merge_chr_ref {
 }
 
 process mbuilder {
-    container "${params.mbuilderContainer}"
+//    container "${params.mbuilderContainer}"
     publishDir params.outdir, mode: 'copy'
     cpus params.taskCpus
     memory "${params.taskMemory}"
