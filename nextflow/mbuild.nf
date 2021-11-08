@@ -48,7 +48,26 @@ if(workflow.profile == 'batch') {
 Channel
     //.fromPath(params.bgFiles, checkIfExists:true)
     .fromPath(params.bgFiles.split(/\s+/).flatten(), checkIfExists:true)
-    .set {bedgraph}
+    .set {bedgraphO}
+
+process gzip_bg {
+    input:
+    path f from bedgraphO
+
+    output:
+    // use includeInputs to include input files
+    path "*.gz" includeInputs true into bedgraph
+
+    script:
+    if(! "$f".endsWith(".gz")) // "$f" is to convert an object to a string
+        """
+        gzip -f $f
+        """
+    else
+        """
+        echo $f is already gzipped
+        """
+}
 
 process build_chr_ref {
     cpus 2
