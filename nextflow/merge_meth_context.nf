@@ -17,6 +17,9 @@ log.info """\
          outdir : ${params.outdir}
          awsQueue: '${params.awsQueue}'
          awsContainer: ${params.container}
+
+         usage: nextflow run merge_meth_context.nf --genome \
+         /path/to/genome.fa --bgFiles '/path/to/bedgraph/files'
          """
          .stripIndent()
 
