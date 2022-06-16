@@ -11,6 +11,9 @@ params.taskCpus = 1
 params.taskMemory = "2 GB"
 params.useRefFile = false // use chromosome name reference file?
 params.cytoContexts = 'CpG'
+params.bgFiles = null
+params.fileList = null
+params.pathPrefix = null
 //params.mbuilderContainer = \$mbuilderContainer
 
 log.info """\
@@ -26,6 +29,15 @@ log.info """\
          Example use:
          nextflow run mbuild.nf --bgFiles 's3://path/*.bedgraph.gz' \
             --useRefFile -with-docker <mbuilder-docker-img:tag>
+         
+         Alternatively, one can put file paths in a text file, one
+         path per line, and feed this file to the parameter
+         --fileList, e.g.:
+
+         nextflow run mbuild.nf --fileList 'files.txt' \
+            --pathPrefix  '/folder/to/files' \
+            --useRefFile -with-docker <mbuilder-docker-img:tag>
+
          ===================================
          """
          .stripIndent()
@@ -45,10 +57,26 @@ if(workflow.profile == 'batch') {
     }
 }
 
-Channel
+if(params.bgFiles != null) {
+    log.info "Reading files from command line"
+    Channel
     //.fromPath(params.bgFiles, checkIfExists:true)
-    .fromPath(params.bgFiles.split(/\s+/).flatten(), checkIfExists:true)
-    .set {bedgraphO}
+        .fromPath(params.bgFiles.split(/\s+/).flatten(), checkIfExists:true)
+        .set {bedgraphO}
+} else if(params.fileList != null) {
+    log.info "Reading files from a file ${params.fileList}"
+    paths=file(params.fileList).readLines()
+    if(params.pathPrefix != null) {
+        paths=paths.collect() { "${params.prefix}/$it" }
+    }
+    // create channel now
+    Channel
+        .fromPath(paths, checkIfExists:true)
+        .set {bedgraphO}
+        
+} else {
+    exit 1, "Both --fileList and --bgFiles parameters are empty"
+}
 
 process gzip_bg {
     input:
