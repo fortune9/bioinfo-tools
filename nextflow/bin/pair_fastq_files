@@ -1,0 +1,126 @@
+#!/bin/bash
+
+set -e
+
+if [[ $# -lt 2 ]]; then
+    cat <<EOF
+Usage: $0 [options] <project-id> <s3path> [<s3path-1> ...]
+
+This program finds all fastq files for a specific
+project in provided s3 paths, and prepare tab-delimited
+file with the following 3 columns:
+
+id  read_1   read_2
+... ...
+
+<project-id>: in#### or zr#### project ids.
+<s3path>: aws s3 path, can be multiple.
+
+Options (default in []):
+
+--r1-tag <str>: if a filename matches this string, it is treated as
+    a file from read1 [_R1_].
+
+--r2-tag <str>: if a filename matches this string, it is treated as
+    a file from read2 [_R2_].
+
+--file-ext <str>: the file extension, any files not matching this
+    will be ignored [fq.gz\|fastq.gz].
+
+--recursive: if provided, sub-folders are also searched. Default
+    is false.
+
+Example use:
+$0 in2876 s3://zymo-sequencing/210917_A01343_0036_AHJMWTDSX2/Data/Intensities/BaseCalls/Alignment_2/
+
+EOF
+    exit 1
+fi
+
+# global variables
+r1Tag='_R1_'
+r2Tag='_R2_'
+fileExt='fq.gz\|fastq.gz'
+recursive=""
+posArgs=()
+
+while [[ $# -gt 0 ]];
+do
+    k=$1; shift;
+    case $k in
+        --r1-tag)
+            r1Tag=$1;
+            shift;
+            ;;
+        --r2-tag)
+            r2Tag=$1;
+            shift;
+            ;;
+        --file-ext)
+            fileExt=$1;
+            shift;
+            ;;
+        --recursive)
+            recursive="--recursive";
+            ;;
+        *)
+            posArgs+=($k)
+            ;;
+    esac
+done
+
+set -- ${posArgs[@]}
+
+prjId=$1;
+shift
+
+fqListFile=tmp.$$
+touch $fqListFile
+
+for s3path in $@
+do
+    if [[ ! "$s3path" =~ ^s3:// ]]; then
+        echo "Invalid s3 path '$s3path'" >&2
+        exit 2
+    fi
+    if [[ ! "$s3path" =~ /$ ]]; then
+        s3path+='/'
+    fi
+    echo "Searching $s3path" >&2
+    aws s3 ls $s3path $recursive | grep $prjId | \
+        grep "\.\($fileExt\)$" | gawk '{print $4}' >$fqListFile
+    prefix=$s3path
+    if [[ "$recursive" ]]; then
+        # use bucket as prefix
+        prefix=$(echo $s3path | sed -e 's!^\(s3://[^/]\+/\).*!\1!')
+    fi
+    # pair the fastq files
+    # 1. make sure the R1 and R2 reads are matched in names, which is
+    # important, particularly for samples with multiple files
+    #paste <(cat $fqListFile | grep "$r1Tag" | sort -V) \
+	#    <(cat $fqListFile | grep "$r2Tag" | sort -V) | \
+	#    gawk -v p="$prefix" -v OFS="\t" \
+	#    'BEGIN{print "id","read_1","read_2"}{id=gensub(/^([^_]+_[0-9]+)[_.].*/, "\\1", 1, gensub(/.*\//,"", 1, $1)); print id, p $1, p $2;}' 
+    cat $fqListFile | grep -E "$r1Tag" | sort -V >tmp.$$.R1
+    cat $fqListFile | grep -E "$r2Tag" | sort -V >tmp.$$.R2
+    paste tmp.$$.R1 <(cat tmp.$$.R2 | sed -E "s/$r2Tag/$r1Tag/") \
+        | gawk '$1!=$2' >tmp.$$.unmatched
+    if [[ $(cat tmp.$$.unmatched | wc -l) -gt 0 ]]; then
+        echo "Read files in '$s3path' are not paired" >&2
+        echo "Here are some related read_1 files" >&2
+        echo "========================" >&2
+        cut -f 1 tmp.$$.unmatched | head >&2
+        echo "========================" >&2
+        exit 3
+    fi
+    paste tmp.$$.R1 tmp.$$.R2 |
+	    gawk -v p="$prefix" -v OFS="\t" \
+	    'BEGIN{print "id","read_1","read_2"}{id=gensub(/^([^_]+_[0-9]+)[_.].*/, "\\1", 1, gensub(/.*\//,"", 1, $1)); print id, p $1, p $2;}' 
+    rm tmp.$$.*
+    rm $fqListFile
+done
+
+echo "Job done" >&2
+
+exit 0
+
