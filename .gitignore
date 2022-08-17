@@ -108,3 +108,6 @@ venv.bak/
 .nextflow/
 /nextflow/work/
 
+# temporary files
+*.swp
+
