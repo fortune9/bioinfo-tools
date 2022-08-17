@@ -24,6 +24,7 @@ process pair_fastq {
 // runs
 process combine_fastq {
     debug params.verbose
+    label 'processMedium'
     publishDir params.outdir, mode: 'copy'
 
     input:
@@ -34,7 +35,7 @@ process combine_fastq {
 
     script:
     """
-    touch $outfile
+    # if fqs is size 1, just need rename input
     for f in $fqs
     do
         mycat=cat
