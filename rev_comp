@@ -1,0 +1,42 @@
+#!/usr/bin/env perl
+
+use strict;
+use Getopt::Long;
+
+my $input = shift;
+
+die usage() unless($input);
+
+
+
+
+if(! -f $input) {
+    chomp $input;
+    print rev_comp($input), "\n";
+    exit 0;
+}
+
+
+exit 0;
+
+sub rev_comp {
+    my $str = shift;
+
+    $str =~ tr/ATCGUatcguNnXx/TAGCAtagcNnXx/;
+    $str = reverse($str);
+
+    return($str);
+}
+
+sub usage {
+
+    print <<USAGE;
+Usage: $0 <input>
+
+This program can reverse-complement sequences. The input
+can be a sequence string or a file containing sequences
+in the format of fasta or fastq.
+
+USAGE
+
+}
