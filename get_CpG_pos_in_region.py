@@ -43,6 +43,15 @@ def process_lines(chunk):
     for l in chunk:
         l = l.strip().split(sep)
         (chrom, start, end, name) = l[:4]
+        # check the coordinates match expectation
+        if not start.isdigit() or not end.isdigit():
+            print(f"Invalid coordinates for [{l}]", file=sys.stderr)
+            continue
+        # make sure start is less than end
+        if int(start) >= int(end):
+            print(f"Start coordinate >= end coordinate for [{l}]", file=sys.stderr)
+            continue
+        # get sequence
         seq = get_seq(chrom, start, end)
         if seq is None:
             print(f"Cannot get sequence for [{l}]", file=sys.stderr)
