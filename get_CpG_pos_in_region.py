@@ -7,7 +7,7 @@ import concurrent.futures
 import threading
 import multiprocessing
 
-VERSION='0.0.1'
+VERSION='0.0.2'
 
 # functions
 def CpG_pos(s):
