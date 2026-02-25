@@ -75,6 +75,7 @@ VERSION <- "0.0.1"
 option_list <- list(
   make_option(
     c("-s", "--simulate-data"),
+    dest = "simulate_data",
     type = "integer",
     default = NULL,
     metavar = "N",
@@ -178,12 +179,6 @@ if (!is.null(args$input_format)) {
   }
 }
 
-# Memory warning for certain readers
-if (args$reader %in% c("fread", "arrow")) {
-  cat("WARNING: Using '", args$reader, "' loads all data into memory. Not recommended for large files.\n", sep = "")
-  cat("         Consider using --reader dataset for memory-efficient processing.\n\n")
-}
-
 # Main logic
 if (!is.null(args$simulate_data)) {
   # Simulate data mode: output CSV format
@@ -215,6 +210,12 @@ if (!is.null(args$simulate_data)) {
     stop(sprintf("Input file '%s' does not exist", args$input))
   }
   
+  # Memory warning for certain readers
+  if (args$reader %in% c("fread", "arrow")) {
+    cat("WARNING: Using '", args$reader, "' loads all data into memory. Not recommended for large files.\n", sep = "")
+    cat("         Consider using --reader dataset for memory-efficient processing.\n\n")
+  }
+
   # Determine input format
   if (!is.null(args$input_format)) {
     input_format <- args$input_format
