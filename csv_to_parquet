@@ -1,0 +1,246 @@
+#!/usr/bin/env Rscript
+
+library(optparse)
+library(data.table)
+
+# Generate random string
+generate_random_name <- function(n = 10) {
+  letters_sample <- sample(letters, n, replace = TRUE)
+  paste0(toupper(letters_sample[1]), paste(letters_sample[2:n], collapse = ""))
+}
+
+# Simulate data
+simulate_data <- function(n_rows) {
+  set.seed(42)
+  dt <- data.table(
+    id = seq_len(n_rows),
+    name = replicate(n_rows, generate_random_name(sample(5:15, 1))),
+    salary = round(runif(n_rows, min = 30000, max = 150000), 2)
+  )
+  return(dt)
+}
+
+# Detect file format from extension
+detect_format <- function(filename) {
+  if (grepl("\\.tsv$", filename, ignore.case = TRUE)) {
+    return("tsv")
+  } else if (grepl("\\.csv$", filename, ignore.case = TRUE)) {
+    return("csv")
+  } else {
+    return("csv")  # default to csv
+  }
+}
+
+# Get separator from format
+get_separator <- function(format) {
+  if (format == "tsv") {
+    return("\t")
+  } else {
+    return(",")
+  }
+}
+
+# Read input file using specified method
+read_input <- function(input_file, reader, input_format) {
+  sep <- get_separator(input_format)
+  
+  if (reader == "fread") {
+    cat(sprintf("Reading with data.table::fread() [loads data into memory, sep='%s']\n", sep))
+    dt <- data.table::fread(input_file, sep = sep)
+  } else if (reader == "arrow") {
+    cat(sprintf("Reading with arrow::read_delim_arrow() [loads data into memory, sep='%s']\n", sep))
+    dt <- arrow::read_delim_arrow(input_file, as_data_frame = FALSE, delim = sep)
+  } else if (reader == "dataset") {
+    cat(sprintf("Reading with arrow::open_dataset() [memory-efficient, recommended, sep='%s']\n", sep))
+    dt <- arrow::open_dataset(input_file, format = input_format)
+  }
+  return(dt)
+}
+
+# Write output using specified method
+write_output <- function(data, output_file, writer) {
+  if (writer == "parquet") {
+    cat("Writing with arrow::write_parquet()\n")
+    arrow::write_parquet(data, output_file)
+  } else if (writer == "dataset") {
+    cat("Writing with arrow::write_dataset()\n")
+    arrow::write_dataset(data, output_file, format = "parquet")
+  }
+}
+
+# Script version
+VERSION <- "0.0.1"
+
+# Define command line options
+option_list <- list(
+  make_option(
+    c("-s", "--simulate-data"),
+    type = "integer",
+    default = NULL,
+    metavar = "N",
+    help = "Number of rows to simulate in the random data.table"
+  ),
+  make_option(
+    c("-i", "--input"),
+    type = "character",
+    default = NULL,
+    metavar = "FILE",
+    help = "Input CSV or TSV file to convert to parquet"
+  ),
+  make_option(
+    c("-f", "--input-format"),
+    dest = "input_format",
+    type = "character",
+    default = NULL,
+    metavar = "FORMAT",
+    help = "Input file format: 'csv' or 'tsv'. Auto-detected from file extension if not specified"
+  ),
+  make_option(
+    c("-r", "--reader"),
+    type = "character",
+    default = "fread",
+    metavar = "METHOD",
+    help = "Method to read input file: 'fread' (data.table::fread), 'arrow' (arrow::read_csv_arrow), or 'dataset' (arrow::open_dataset). Note: 'fread' and 'arrow' load data into memory and are NOT recommended for large files. [default: %default]"
+  ),
+  make_option(
+    c("-w", "--writer"),
+    type = "character",
+    default = "parquet",
+    metavar = "METHOD",
+    help = "Method to write output file: 'parquet' (arrow::write_parquet) or 'dataset' (arrow::write_dataset). [default: %default]"
+  ),
+  make_option(
+    c("-o", "--output"),
+    type = "character",
+    default = NULL,
+    metavar = "FILE",
+    help = "Output file path"
+  ),
+  make_option(
+    c("-v", "--version"),
+    action = "store_true",
+    default = FALSE,
+    help = "Show version information"
+  )
+)
+
+# Parse command line arguments
+parser <- OptionParser(
+  usage = "%prog [options]",
+  option_list = option_list,
+  description = "Convert CSV/TSV to parquet format or simulate random data",
+  epilogue = "
+  Examples:
+  # Simulate random data (output as CSV)
+  %prog --simulate-data 1000
+  %prog -s 1000 -o simulated.csv
+  
+  # Convert CSV to parquet (auto-detect format)
+  %prog --input data.csv
+  %prog -i data.csv -r dataset -w parquet
+  
+  # Convert TSV to parquet
+  %prog --input data.tsv
+  %prog -i data.tsv --input-format tsv -r dataset
+  
+  # Specify reader and writer explicitly
+  %prog -i large_file.csv -r dataset -w dataset -o output.parquet
+  
+  # Show help
+  %prog --help"
+)
+
+args <- parse_args(parser)
+
+# Handle version option
+if (args$version) {
+  cat(sprintf("%s\n", VERSION))
+  quit(status = 0)
+}
+
+# Validate reader option
+valid_readers <- c("fread", "arrow", "dataset")
+if (!args$reader %in% valid_readers) {
+  stop(sprintf("Invalid reader '%s'. Choose from: %s", args$reader, paste(valid_readers, collapse = ", ")))
+}
+
+# Validate writer option
+valid_writers <- c("parquet", "dataset")
+if (!args$writer %in% valid_writers) {
+  stop(sprintf("Invalid writer '%s'. Choose from: %s", args$writer, paste(valid_writers, collapse = ", ")))
+}
+
+# Validate input-format option if provided
+if (!is.null(args$input_format)) {
+  valid_formats <- c("csv", "tsv")
+  if (!args$input_format %in% valid_formats) {
+    stop(sprintf("Invalid input-format '%s'. Choose from: %s", args$input_format, paste(valid_formats, collapse = ", ")))
+  }
+}
+
+# Memory warning for certain readers
+if (args$reader %in% c("fread", "arrow")) {
+  cat("WARNING: Using '", args$reader, "' loads all data into memory. Not recommended for large files.\n", sep = "")
+  cat("         Consider using --reader dataset for memory-efficient processing.\n\n")
+}
+
+# Main logic
+if (!is.null(args$simulate_data)) {
+  # Simulate data mode: output CSV format
+  cat(sprintf("Simulating data with %d rows...\n", args$simulate_data))
+  dt <- simulate_data(args$simulate_data)
+  cat("Generated data.table:\n")
+  print(dt)
+  
+  # Determine output file path
+  output_file <- args$output
+  if (is.null(output_file)) {
+    output_file <- "simulated_data.csv"
+  } else {
+    # Ensure CSV extension for simulated data
+    if (!grepl("\\.csv$", output_file)) {
+      output_file <- sub("\\.(parquet|tsv|txt)$", ".csv", output_file)
+      if (!grepl("\\.csv$", output_file)) {
+        output_file <- paste0(output_file, ".csv")
+      }
+    }
+  }
+  
+  fwrite(dt, output_file)
+  cat(sprintf("Data saved to %s\n", output_file))
+  
+} else if (!is.null(args$input)) {
+  # CSV/TSV to parquet conversion mode
+  if (!file.exists(args$input)) {
+    stop(sprintf("Input file '%s' does not exist", args$input))
+  }
+  
+  # Determine input format
+  if (!is.null(args$input_format)) {
+    input_format <- args$input_format
+    cat(sprintf("Using specified input format: %s\n", toupper(input_format)))
+  } else {
+    input_format <- detect_format(args$input)
+    cat(sprintf("Auto-detected input format: %s\n", toupper(input_format)))
+  }
+  
+  cat(sprintf("Reading input file: %s\n", args$input))
+  dt <- read_input(args$input, args$reader, input_format)
+  
+  cat("Data loaded:\n")
+  print(dt)
+  
+  # Determine output file path
+  output_file <- args$output
+  if (is.null(output_file)) {
+    output_file <- sub("\\.(csv|tsv)$", "", args$input, ignore.case = TRUE)
+    output_file <- paste0(output_file, ".parquet")
+  }
+  
+  # Write output
+  write_output(dt, output_file, args$writer)
+  cat(sprintf("Data saved to %s\n", output_file))
+  
+} else {
+  print_help(parser)
+}
